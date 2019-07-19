@@ -1,0 +1,52 @@
+State,StateName,StateAbbr,ElectoralVotes,AllowsPartyRegistration,VoterIDLaw,VoterIDLawVerbose,ClosedPrimary
+6,California,CA,55,TRUE,0,Non-strict,FALSE
+17,Illinois,IL,20,FALSE,0,Non-strict,FALSE
+19,Iowa,IA,6,TRUE,0,Non-strict,FALSE
+23,Maine,ME,4,TRUE,0,Non-strict,TRUE
+24,Maryland,MD,10,TRUE,0,Non-strict,FALSE
+25,Massachusetts,MA,11,TRUE,0,Non-strict,FALSE
+27,Minnesota,MN,10,FALSE,0,Non-strict,FALSE
+31,Nebraska,NE,5,TRUE,0,Non-strict,TRUE
+32,Nevada,NV,6,TRUE,0,Non-strict,FALSE
+34,New Jersey,NJ,14,TRUE,0,Non-strict,TRUE
+35,New Mexico,NM,5,TRUE,0,Non-strict,TRUE
+36,New York,NY,29,TRUE,0,Non-strict,TRUE
+37,North Carolina,NC,15,TRUE,0,Non-strict,FALSE
+38,North Dakota,ND,3,FALSE,0,Non-strict,FALSE
+41,Oregon,OR,7,TRUE,0,Non-strict,FALSE
+42,Pennsylvania,PA,20,TRUE,0,Non-strict,TRUE
+50,Vermont,VT,3,FALSE,0,Non-strict,FALSE
+54,West Virginia,WV,5,TRUE,0,Non-strict,FALSE
+56,Wyoming,WY,3,TRUE,0,Non-strict,TRUE
+1,Alabama,AL,9,FALSE,0,Non-strict,FALSE
+2,Alaska,AK,3,TRUE,0,Non-strict,FALSE
+5,Arkansas,AR,6,FALSE,0,Non-strict,FALSE
+8,Colorado,CO,9,TRUE,0,Non-strict,FALSE
+9,Connecticut,CT,7,TRUE,0,Non-strict,FALSE
+10,Delaware,DE,3,TRUE,0,Non-strict,TRUE
+11,District of Columbia,DC,3,TRUE,0,Non-strict,FALSE
+12,Florida,FL,29,TRUE,0,Non-strict,TRUE
+21,Kentucky,KY,8,TRUE,0,Non-strict,TRUE
+29,Missouri,MO,10,FALSE,0,Non-strict,FALSE
+30,Montana,MT,3,FALSE,0,Non-strict,FALSE
+40,Oklahoma,OK,7,TRUE,0,Non-strict,FALSE
+45,South Carolina,SC,9,FALSE,0,Non-strict,FALSE
+49,Utah,UT,6,TRUE,0,Non-strict,FALSE
+53,Washington,WA,12,FALSE,0,Non-strict,FALSE
+15,Hawaii,HI,4,FALSE,0,Non-strict,FALSE
+16,Idaho,ID,4,TRUE,0,Non-strict,FALSE
+22,Louisiana,LA,8,FALSE,0,Non-strict,FALSE
+26,Michigan,MI,16,FALSE,0,Non-strict,FALSE
+44,Rhode Island,RI,4,TRUE,0,Non-strict,FALSE
+46,South Dakota,SD,3,TRUE,0,Non-strict,FALSE
+4,Arizona,AZ,11,FALSE,0,Non-strict,FALSE
+39,Ohio,OH,18,FALSE,0,Non-strict,FALSE
+48,Texas,TX,38,FALSE,0,Non-strict,FALSE
+13,Georgia,GA,16,FALSE,1,Strict,FALSE
+18,Indiana,IN,11,FALSE,1,Strict,FALSE
+20,Kansas,KS,6,TRUE,1,Strict,TRUE
+28,Mississippi,MS,6,FALSE,1,Strict,FALSE
+33,New Hampshire,NH,4,TRUE,1,Strict,FALSE
+47,Tennessee,TN,11,FALSE,1,Strict,FALSE
+51,Virginia,VA,13,FALSE,1,Strict,FALSE
+55,Wisconsin,WI,10,FALSE,1,Strict,FALSE
