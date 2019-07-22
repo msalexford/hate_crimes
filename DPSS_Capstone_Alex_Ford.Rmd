@@ -1,0 +1,472 @@
+---
+title: "DPSS Capstone"
+author: "Alex Ford"
+date: "7/18/2019"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r, include = FALSE}
+library(tidyverse)
+library(jsonlite)
+library(sf)
+library(tidycensus)
+library(haven)
+library(tinytex)
+library(knitr)
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(stargazer)
+```
+
+
+# The United States Hate Crime Rate
+
+## The problem of hate crime data in the U.S.
+
+The Federal Bureau of Investigation defines a hate crime as a violent or property crime – such as a murder, arson, assault, or vandalism – that is “motivated in whole or in part by an offender’s bias against a race, religion, disability, sexual orientation, ethnicity, gender, or gender identity”) each year (Swathi Shanmugasundaram, “Hate Crimes Explained”, 2018).
+
+America’s current hate crime legislation stands on decades of previous efforts, including:
+
+* **The Civil Rights Act of 1968**, which permitted the federal prosecution of anyone who "willfully injures, intimidates or interferes with, or attempts to injure, intimidate or interfere with ... any person because of his race, color, religion or national origin" or interferes with an individual's attempt to engage in federally-protected activities, such as attending school, patronizing a public place, applying for employment, acting as a juror, or voting; this act instituted minimal fines and brief imprisonment (if the perpetrator used certain firearms) for violators
+* **The Violent Crime Control and Law Enforcement Act of 1994**, which required an increase in penalties for hate crimes committed on the basis of the actual or perceived race, color, religion, national origin, ethnicity, or gender of any person
+* **The Church Arson Prevention Act of 1996**, which made federal criminal code prohibitions against and penalties for damaging religious property or obstructing religious practice
+* **The Matthew Shepard and James Byrd, Jr. Hate Crimes Prevention Act of 2009**, which expanded hate crimes statutes to include a victim's actual or perceived gender, sexual orientation, gender identity, or disability, and dropped the prerequisite that the victim be engaging in a federally protected activity
+
+In addition to this federal legislation, states have their own statutes criminalizing various types of bias-motivated violence ("Federal Civil Rights Statutes", 2016).
+
+The Bureau of Justice Statistics states that 250 thousand people are victimized by hate crimes in the United States each year; however, FBI, which relies on voluntary reporting, shows a much lower number. In their annual report, the FBI estimates between five- to six-thousand incidents occurring nationwide (“Hate Crime”, Bureau of Justice Statistics (BJS)).
+
+```{r gathering_data, include = FALSE, results="hide"}
+census_api_key("376fa29de766d259d95581e8e6ede8addb6a9b7b") #install=TRUE
+
+vars <- load_variables(2016, "acs5")
+
+census_data <- get_acs(
+  geography = "state",
+  geometry = TRUE,
+  shift_geo = TRUE,
+  variables = c(
+    total_pop = "B01003_001",
+    household_income = "B19001_001",
+    unemployed_pop = "B23025_007",
+    hs_diploma_pop = "B15003_017",
+    white_pop = "B02001_002",
+    poverty_pop = "B05010_001",
+    acs_gini = "B19083_001"),
+  year = 2016,
+)
+
+census_data <- census_data %>%
+  select(-moe) %>%
+  spread(variable, estimate)
+
+census_data <- census_data[-c(9),]
+
+census_data <- census_data %>%
+  mutate(
+    pct_unemployed = unemployed_pop / total_pop,
+    pct_hs_only = hs_diploma_pop / total_pop,
+    pct_poor_white = white_pop / poverty_pop,
+    pct_non_white = (total_pop - white_pop) / total_pop
+  )
+
+regions <- read_csv("ucb_regions.csv") %>%
+  select(-"State Code")
+
+census_data <- census_data %>%
+  left_join(regions, by = c("NAME" = "State"))
+
+kaiser_non_citizen <- read_csv("kaiser_citizen_data.csv") %>%
+  select(-total)
+
+census_data <- census_data %>%
+  left_join(kaiser_non_citizen, by = "NAME")
+
+fbi_data <- read_csv("fbi_agency_hc_reporting_by_state_2017.csv") %>%
+  mutate(hate_crimes_per_100k = total_reported_incidents / pop_covered * 100000)
+
+census_data <- census_data %>%
+  left_join(fbi_data, by = c("NAME" = "Participating_state"))
+
+pupil_spending <- read_csv("pupil_spending.csv")
+census_data <- left_join(census_data, pupil_spending, by = c("NAME" = "State"))
+
+body_cam <- read_csv("body_cam_data.csv")
+census_data <- left_join(census_data, body_cam, by = c("NAME" = "state"))
+
+```
+
+```{r, echo=FALSE, warning = FALSE}
+#hate_crimes_x_state <-
+ggplot() +
+  geom_sf(
+    data = census_data,
+    aes(fill = hate_crimes_per_100k)) +
+  scale_fill_distiller(
+    palette = "Blues",
+    type = "seq",
+    direction = "1",
+    guide = "colorbar"
+  ) +
+  theme_void() +
+  labs(
+    title = "Hate Incident Rates",
+    subtitle = "Hate incidents per 100,000 residents in 2017.",
+    caption = "Source: FBI"
+  ) +
+  theme(
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5, size = 8, face = "italic")
+  )
+
+#ggsave(filename = "hate_crimes_x_state.png", plot = hate_crimes_x_state)
+```
+
+In order to create policy that reduces the number of hate crimes, the U.S. needs to first institute federal legislation that requires all law enforcement agencies to diligently collect and report crime data to the FBI. Without adequate data to analyze, we cannot create an accurate portrait of hate crimes in the U.S.
+
+## Coda - what might influence hate crimes
+
+It’s important to innovate not only our approach to data collection as a baseline upon which to analyze and reform our practices, but also to consider the factors of American life that could influence the rate of hate crimes and make every effort to mitigate these factors. Racism itself is pervasive and stubborn, and not something easily dismantled; however it is our responsibility to consider the ways in which we could ameliorate its contributing factors, such as offensive campaign speech, income inequality, and real or perceived disenfranchisement.
+
+\pagebreak
+
+## More on our data problem - a defiantly state-governed society
+
+**Voluntary reporting**
+
+Perhaps our biggest obstacle is that reporting to the FBI’s Uniform Crime Reporting (UCR) program, which compiles official data on crime in the U.S. each year, relies on voluntary reporting from ~18,000 agencies, rendering our available data incomplete. There is a roughly 15% participation rate; some states, such as Hawaii, submit no data at all.
+
+In addition, the UCR program collects data on a specific subset of hate crimes that are relevant to the organization’s scope--prosecutable hate crimes--which make up only a fraction of total hate crimes.
+
+A more accurate data set would include not only prosecutable hate crimes but offenses that are non-prosecutable, such as circulation of discriminatory literature (Shanmugasundaram, “Hate Crimes”).
+
+**Variance in definition of hate crimes**
+
+While the federal government and 45 states (all but Arkansas, Georgia, Indiana, South Carolina, and Wyoming) have passed hate crime legislation that enhances penalties for the crime itself, laws vary on their definition of what constitutes a hate crime and which groups are protected (Shanmugasundaram, “Hate Crimes”). While all laws cover bias against race, ethnicity, and religion, many lack statutes on gender, disability, sexual orientation, and gender identity.
+
+**Variance in officer training**
+
+Enforcing these laws brings challenges of their own: only 12 states have laws requiring that officers be trained to identify and investigate hate crimes, according to the Southern Poverty Law Center (Shanmugasundaram, “Hate Crimes”).
+
+**Trust concerns**
+
+In addition, as members of communities that have historically been marginalized and exploited by institutions, victims of hate crimes are also less likely to report their experiences to authorities.
+
+<br>
+
+```{r, include = FALSE, results="hide"}
+
+hate_crimes_us_main <- read_csv("us_hate_crime_data.csv")
+
+hate_crimes_us_main <- hate_crimes_us_main %>%
+  mutate(
+    us_hate_crimes_per_100k = us_hate_crime / total_us_pop * 100000,
+    us_crimes_per_100k = total_us_crimes / total_us_pop * 100000
+  )
+
+```
+
+## Conclusions we can draw from the data that we do have & further research
+
+A state reporting higher numbers may not necessarily mean that the state experiences a higher rate of hate crime occurrences than another, but rather that they prioritize accurate reporting more, and this could vary dramatically on a district level, potentially neutralizing observed differences at the state level.
+
+Especially in states as large as Texas or California, some districts could emphasize officer training, while others might not have the inclination or resources to do so.
+
+Recognition of the importance of data collection in law enforcement is growing in popularity among some officials. In a statement to The New York Times, Will Johnson, the chief of police in Arlington, Texas, and a vice president of the International Association of Chiefs of Police said: “More importantly than anything else is the effective conversation and heightened awareness in communities that this is important and that government institutions are prepared to respond effectively to crimes that victimize broadly across our communities.” The chief’s association passed a resolution encouraging law enforcement agencies to collect, analyze and report on hate crimes (John Eligon, “Hate Crimes Increase for the Third Consecutive Year, F.B.I. Reports”, 2018).
+
+Even former FBI director James Comey, while introducing the 2015 hate crimes report said, “We need to do a better job of tracking and reporting hate crimes to fully understand what is happening in our communities and how to stop it” (Mark Berman, "Hate Crimes in the United States Increased Last Year, the FBI Says", 2017).
+
+In a 2015 report, the Justice Research and Statistics Association (JRSA) petitioned for a broader and deeper approach to collecting data on and strategizing about crime in the United States.
+
+```{r, echo=FALSE}
+
+#hate_crimes_x_time <-
+ggplot(data = hate_crimes_us_main, aes(x = year, y = us_hate_crimes_per_100k)) +
+  geom_bar(stat = "identity", position = "dodge", fill ="tomato3", width = .75) +
+  scale_x_discrete("Year", limits = c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017), expand = c(0,0)) +
+  scale_y_continuous("Hate Crimes per 100K", expand = c(0,0), breaks = c(0, 0.5, 1, 1.5, 2, 2.5, 3), limits = c(0, 3)) +
+  ggtitle("US Hate Crime Incident Reports Over Time") +
+  labs(caption = "Source: FBI") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle=65, vjust = 0.6),
+    axis.title.x = element_text(margin = margin(t = 15, r = 20, b = 1, l = 1)),
+    axis.title.y = element_text(margin = margin(t = 5, r = 20, b = 1, l = 1)),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+#ggsave(filename = "hate_crimes_x_time.png", plot = hate_crimes_x_time)
+```
+
+If we decide that we want to study data collection first and hate crime factors second, we might drill down to districts rather than states, and create a new data set using the dependent variable of number of hate crimes reported (rather than number occured) and independent variables of progressive measures that may lead to higher rates of reporting. Of course, it would be difficult to make any blanket statements using this research other than a broad correlation between agencies that roll out more progressive policies and higher rates of reporting. It would be difficult to untangle the cause-effect relationships that might lead a given agency to institute these policies, unless we undertake a thorough research project. We would have to consider:
+
+* Percentage of population that are vulnerable minorities
+* Historical political leanings of the state (perhaps also the state / agency’s perception of federal governing)
+* Landmark court cases in the area
+* Personalities in power
+* Law enforcement scandals
+
+## Contributing factors to hate crimes
+
+### Public hate speech
+
+While political discourse has veered into divisive territory in the past, hate speech has become sadly commonplace in recent elections, with candidates often instructing their base to commit hate crimes on certain populations in so many words. Most recently, President Donald Trump has riled his supporters against a group of U.S. congresswomen of diverse ethnicities, all American citizens, telling them to “go back to where they came from”. Trump’s rhetoric has included epithets against not only non-whites, but non-citizens, disabled persons, women, LGBT, and non-Christians.
+
+In the month following the presidential election in 2016, the Southern Poverty Law Center documented 1,094 bias-related incidents and noted that 37% of them directly referenced Trump and his comments (Shanmugasundaram, “Hate Crimes”).
+
+Whether we interpret this spike as an increase in bigotry, or as a change in climate more tolerant of public expressions of bigotry, we cannot underestimate the core issue of division in the U.S. and the fractionating off of what can be seen as “tribal” groups. “For the N.A.A.C.P., we began to see this during the presidential election in 2015,” said Derrick Johnson, the president of the organization. “The level of tribalism that was being fueled by presidential candidates, the acceptance of intolerance that has been condoned by President Trump and many others across the country has simply emboldened individuals to be more open and notorious with their racial hatred” (John Eligon, “Hate Crimes Increase for the Third Consecutive Year, F.B.I. Reports”, 2018).
+
+To further explore this relationship, we might measure correlation between instances of hate speech use on platforms such as Twitter, and instances of hate crimes, broken down by classification.
+
+## Real or perceived inequality
+
+Analysis by the FBI and groups like the Southern Poverty Law Center has shown correlation between levels of income inequality and incidences of hate crimes, a correlation that was noted again by Five-Thirty-Eight in the wake of the 2016 general election (Maiamajumder, “Higher Rates Of Hate Crimes Are Tied To Income Inequality”, 2017).
+
+Research dating from 1968 by economist Gary S. Becker states that more violence is likely in areas with wider socioeconomic gaps, as potential criminals perceive greater returns (Pinsker, “Does Inequality Cause Crime?”, 2014). This sort of cost-benefit analysis is a common refrain in discussions of strife, but it’s worth drilling down further to see what more nuances can be ascertained in the specific case of hate crimes.
+
+# Our regression
+
+Using our two core assumptions of hate crime frequency (a data set that measures reporting rather than occurrences, and economic inequality as a contributor to bigotry), we can build a starter regression to gather some initial conclusions from which to move forward.
+
+## Core variables
+
+The main variables included in this assessment of the rate of hate crimes in the U.S. include a series of measures of wealth, education, employment, and diversity:
+
+* Median household income
+* Percent of the population that is unemployed
+* Percent of the population with only a high school degree
+* Percent of whites below the poverty line, the GINI index (a measure of income disparity)
+* Percent of the population that is non-white
+* Percent of the population that are not US citizens
+
+## Additional independent variables
+
+In addition, I’ve chosen to include variables that may influence the level of hate crimes: **total expenditure per public school student per state** and **whether or not an agency has made at least one effort toward policing transparency** (required the use of body cameras on officers, requested funding for the institution of body cameras on officers, or created open record laws).
+
+### Public school pupil spending
+In this intuition, a state that devotes more funds to public school pupil has a more well-supported public school network, likely a more diverse learning environment. Well-funded public schools would also indicate citizen support for and use of the public school system (as opposed to private or charter schools), which could imply a greater popular comfort with diversity.
+
+### Police transparency measures
+I’ve also included a variable that may influence the likelihood of an agency to report: whether or not an agency has made at least one effort toward policing transparency (required the use of body cameras on officers, requested funding for the institution of body cameras on officers, or created open record laws).
+
+By using these two additional variables, I hope to assess the impact on the rate of hate crimes and rate of reporting, respectively. Interaction terms are used on wealth and wealth-adjacent variables of household income, percent unemployed, and the GINI index.
+
+```{r, echo = FALSE, comment = "" , message=FALSE, warning=FALSE, header=FALSE, results = "asis"} 
+regression1 <- lm(
+  hate_crimes_per_100k ~
+    household_income +
+    pct_unemployed +
+    pct_hs_only +
+    pct_poor_white +
+    acs_gini +
+    pct_non_white +
+    pct_non_citizen +
+    total_spending_per_pupil +
+    at_least_one_effort,
+  data = census_data)
+
+regression2 <- lm(
+  hate_crimes_per_100k ~
+    household_income*pct_unemployed*acs_gini +
+    pct_hs_only +
+    acs_gini +
+    pct_poor_white +
+    pct_non_white +
+    pct_non_citizen +
+    total_spending_per_pupil +
+    at_least_one_effort,
+  data = census_data)
+
+```
+
+```{r mylatextable, results = "asis"}
+stargazer(regression1, type = "latex",
+          title = "Results",
+          covariate.labels = c(
+            "Household income",
+            "Percent unemployed",
+            "Percent high school only",
+            "Percent poor white",
+            "ACS GINI",
+            "Percent non-white",
+            "Percent non-citizen",
+            "Total spending per public school student",
+            "Introduced progressive policing efforts"
+            ),
+          dep.var.labels = "Hate crimes per 100k")
+```
+
+
+```{r, results = "asis"}
+stargazer(regression2, type = "latex",
+          title = "Results with interaction terms",
+          covariate.labels = c(
+            "Household income",
+            "Percent unemployed",
+            "ACS GINI",
+            "Percent high school only",
+            "Percent poor white",
+            "Percent non-white",
+            "Percent non-citizen",
+            "Total spending per public school student",
+            "Introduced progressive policing efforts",
+            "Household income : percent unemployed",
+            "Household income : ACS GINI",
+            "Percent unemployed : ACS GINI",
+            "Household income : percent unemployed : ACS GINI"
+            ),
+          dep.var.labels = "Hate crimes per 100k")
+```
+
+
+```{r, warning = FALSE, echo=FALSE}
+
+#policing_transparency <-
+ggplot(
+    data = census_data,
+    aes(x = NAME, y = hate_crimes_per_100k, colour = factor(at_least_one_effort))
+    ) +
+  geom_point() +
+  theme(
+    axis.text.y = element_text(size = 5, hjust = 0.95, vjust = 0.2),
+    axis.title.x = element_text (size = 8, hjust = 0.5),
+    axis.title.y = element_blank(),
+    plot.caption = element_text(size = 5, hjust = 0.5, face = "italic"),
+    plot.title = element_text(hjust = 0.5)
+  ) +
+  coord_flip() +
+  labs(
+    title = "State Policing Transparency Initiatives",
+    caption = "Indicates that states have requirements for or allocated funding for body cameras, and/or have open record laws. Source: NCSL.",
+    y = "Hate Crimes per 100K"
+  ) +
+    scale_color_manual(
+      name = "Initiative Taken",
+      labels = c("No", "Yes"),
+      values = c("royalblue2", "seagreen2"),
+      guide = 'legend'
+  )
+
+#ggsave(filename = "policing_transparency.png", plot = policing_transparency)
+```
+
+\pagebreak
+
+# Takeaways
+
+Our regression showed statistical significance with the variables of percent only high school-educated, percent non-citizen, and the total expenditure per public school student. While pupil spending does show some statistical significance, I would like to repeat the test replacing dollar value with percent of state budget for a more accurate picture, and perhaps include more measurements of the educational system (US Census Bureau, “2017 Public Elementary- Secondary Education Finance Data”, 2017). The current stat may indicate state wealth rather than priority of public education spending.
+
+While our data used to assess the likelihood of a given state’s agencies to embrace more progressive trans- parency measures, it is limited and binary. Other factors may influence the decision (such as public scandal) that cannot be disentangled from rate of hate crimes. It would be interesting to continue this research using more qualitative and quantitative data – interviewing and gathering data by agency/district (NCSL, “Civil and Criminal Justice”, 2019).
+
+I would also add more measures of perceived inequality by potential perpetrators of crimes (such as the percentage of state budget allocated for social services such as WIC and immigrant support).
+
+# Conclusion
+
+As a final assessment of our data, I analyzed the differences in reported incidents between the United States and the United Kingdom. While at first glance it may appear that the United Kingdom is experiencing a vastly higher crime rate and proportion of hate crimes, what is more likely is that their reporting process is more rigorous and regulated and their legislation on hate crimes is more uniform. This brings the difference in priority of hate crime mitigation between our countries into stark reality.
+
+```{r, include = FALSE, warnings = "FALSE"}
+hate_crimes_us <- hate_crimes_us_main %>%
+  select(year, us_hate_crime, total_us_pop, total_us_crimes, us_hate_crimes_per_100k, us_crimes_per_100k) %>%
+  filter(year >= 2012)
+
+hate_crimes_uk <- read_csv("uk_hate_crime_data.csv") %>%
+  mutate(
+    uk_hate_crimes_per_100k = uk_hate_crime / total_uk_pop * 100000,
+    uk_crimes_per_100k = total_uk_crimes / total_uk_pop * 100000
+    )
+
+hate_crimes_us_vs_uk <- hate_crimes_us %>%
+  left_join(hate_crimes_uk, by = "year") %>%
+  select(year, us_hate_crimes_per_100k, us_crimes_per_100k, uk_hate_crimes_per_100k, uk_crimes_per_100k)
+
+hate_crimes_us_vs_uk_plot <- hate_crimes_us_vs_uk %>%
+  gather(type, crimes_per_100k, -year) %>%
+  mutate(place = str_sub(type, 1, 2)) %>%
+           mutate(type = str_sub(type, 4, 7))
+
+hate_crimes_us_vs_uk_plot <- with(hate_crimes_us_vs_uk_plot, hate_crimes_us_vs_uk_plot[order(year, type, place),])
+
+```
+
+```{r, echo=FALSE}
+
+#us_vs_uk_reports <-
+ggplot(data = hate_crimes_us_vs_uk_plot, aes(x = place, y = crimes_per_100k, fill = type)) +
+  geom_bar(stat = "identity") +
+  facet_grid(~year) +
+  theme_light() +
+  labs(
+    title = "UK vs. US Crime Reporting, 2012-2017",
+    x = "",
+    y = "Crimes per 100K",
+    fill = "Breakdown",
+    caption = "Source: Statistica"
+  ) +
+  scale_fill_manual(
+    labels = c("Total", "Hate"), values = c("skyblue", "tomato1")) +
+  theme(
+    plot.title = element_text(size = 12, margin = margin(t=20, b=20), hjust = 0.5),
+    axis.text.x = element_text(angle=65, vjust = 0.6),
+    axis.text.y = element_text(size = 6, margin = margin(l = 10))
+  )
+
+#ggsave(filename = "us_vs_uk_reports.png", plot = us_vs_uk_reports)
+```
+
+This chasm should spur the United States to be more serious in our data collection undertakings – through actions such as incentivizing and training local authorities– especially with respect to the unfortunate nature of the crimes occurring, and to advocate more intently to protect our historically vulnerable groups.
+
+The U.S. faces a unique challenge in regulating hate speech that the UK does not, given the centrality of our uncurtailable first amendment, and its clash, in some cases, with our values of equality for all. Freedom of speech in the U.S. is iron clad and can in practice be considered an immunity (or a negative right), rather than a right (Marvin Ammori, "Negative Liberty and What the First Amendment Ought to Be”,  2012).
+
+Given these constitutional restrictions, our best bet might be to blanket criminalize actions, thoroughly train officers, and require adequate data collection.
+
+Especially considering the escalation of hate speech in the current political environment, American authorities need to:
+
+* Enact nationwide legislation that clarifies what constitutes a hate crime
+* Define how hate crimes should be recognized by law enforcement officers in the face of a victim community reticent to report
+* Clarify how hate crimes should be prosecuted (delineation of scope and responsibility so cases don’t fall through the cracks)
+* Require every law enforcement agency to report all recorded crimes to the FBI
+Institute auditing of data collection methods during this transition period
+
+In times of political tumult, the U.S. has traditionally leaned on federal protections to keep our marginalized populations from feeling unwelcome and unsafe in our country. While the current climate can’t reasonably be compared to the Civil War’s level of strife, the same reminders apply -- that the United States was conceived in liberty and dedicated to the proposition of equality -- in order for these ideals to endure in practice, we need to embrace the unfinished work of protecting our marginalized populations. This will occur only with more stringency of criminalization, reporting, and penalization.
+
+\pagebreak
+
+#### Sources
+
+Ammori, Marvin. "Negative Liberty and What the First Amendment Ought to Be." Stanford Law School Center for Internet and Society. February 3, 2012. Accessed July 22, 2019. http://cyberlaw.stanford.edu/blog/2012/02/negative-liberty-and-what-first-amendment-ought-be.
+
+Berman, Mark. "Hate Crimes in the United States Increased Last Year, the FBI Says." The Washington Post. November 13, 2017. Accessed July 22, 2019. https://www.washingtonpost.com/news/post-nation/wp/2017/11/13/hate-crimes-in-the-united-states-increased-last-year-the-fbi-says/?utm_term=.52dd4a1f0b28.
+
+"Civil and Criminal Justice." Civil and Criminal State Legislative Issues | Bill Tracking. Accessed July 19, 2019. http://www.ncsl.org/research/civil-and-criminal-justice.aspx.
+
+"Crime in England and Wales 2019." Statista. Accessed July 19, 2019. https://www.statista.com/statistics/283069/recorded-crimes-in-england-and-wales-uk-y-on-y/.
+
+Eligon, John. "Hate Crimes Increase for the Third Consecutive Year, F.B.I. Reports." The New York Times. November 13, 2018. Accessed July 22, 2019. https://www.nytimes.com/2018/11/13/us/hate-crimes-fbi-2017.html.
+
+"Federal Civil Rights Statutes." FBI. May 16, 2016. Accessed July 22, 2019. https://www.fbi.gov/investigate/civil-rights/federal-civil-rights-statutes.
+
+"Hate Crime." Bureau of Justice Statistics (BJS). Accessed July 19, 2019. https://www.bjs.gov/index.cfm?ty=tp&tid=37.
+
+Maiamajumder. "Higher Rates Of Hate Crimes Are Tied To Income Inequality." FiveThirtyEight. January 23, 2017. Accessed July 19, 2019. https://fivethirtyeight.com/features/higher-rates-of-hate-crimes-are-tied-to-income-inequality/.
+
+Pinsker, Joe. "Does Inequality Cause Crime?" The Atlantic. October 23, 2014. Accessed July 19, 2019. https://www.theatlantic.com/business/archive/2014/10/does-inequality-cause-crime/381748/.
+
+Shanmugasundaram, Swathi. "Hate Crimes, Explained." Southern Poverty Law Center. April 15, 2018. Accessed July 19, 2019. https://www.splcenter.org/20180415/hate-crimes-explained.
+
+US Census Bureau. "2017 Public Elementary-Secondary Education Finance Data." 2017 Public Elementary-Secondary Education Finance. April 19, 2019. Accessed July 19, 2019. https://www.census.gov/data/tables/2017/econ/school-finances/secondary-education-finance.html.
+
+
+
+
+
+
+
+
+
